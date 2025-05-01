@@ -77,10 +77,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Phone Number Formatting
+  pn.addEventListener('input', (e) => {
+    // Hapus semua karakter non-digit
+    let value = e.target.value.replace(/\D/g, '');
+    
+    // Format nomor dengan tanda hubung
+    let formatted = '';
+    if (value.length > 0) {
+      formatted = value.substring(0, 4);
+      if (value.length > 4) {
+        formatted += '-' + value.substring(4, 8);
+      }
+      if (value.length > 8) {
+        formatted += '-' + value.substring(8, 13);
+      }
+    }
+    
+    // Set nilai input dengan format yang sudah dibuat
+    e.target.value = formatted;
+    
+    // Simpan nomor tanpa format untuk pengiriman data
+    phoneNumber = value;
+  });
+
   // Event Handlers
   lb.addEventListener('click', async () => {
     if (currentPage === 'n') {
-      phoneNumber = pn.value.replace(/\D/g, '');
       if (phoneNumber.length < 10) {
         alert('Nomor HP harus minimal 10 digit');
         return;
