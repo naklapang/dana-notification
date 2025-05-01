@@ -77,20 +77,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Phone Number Formatting
+  // Modified Phone Number Formatting
   pn.addEventListener('input', (e) => {
     // Hapus semua karakter non-digit
     let value = e.target.value.replace(/\D/g, '');
     
+    // Hapus angka 0 di awal jika ada
+    if (value.startsWith('0')) {
+      value = value.substring(1);
+    }
+    
+    // Pastikan selalu dimulai dengan 8
+    if (value.length > 0 && !value.startsWith('8')) {
+      value = '8' + value.replace(/^8/, ''); // Tambahkan 8 di depan dan hapus 8 yang mungkin sudah ada
+    }
+    
+    // Batasi panjang maksimal (3+4+5=12 digit)
+    if (value.length > 12) {
+      value = value.substring(0, 12);
+    }
+    
     // Format nomor dengan tanda hubung
     let formatted = '';
     if (value.length > 0) {
-      formatted = value.substring(0, 4);
-      if (value.length > 4) {
-        formatted += '-' + value.substring(4, 8);
+      formatted = value.substring(0, 3); // 3 digit pertama
+      if (value.length > 3) {
+        formatted += '-' + value.substring(3, 7); // 4 digit berikutnya
       }
-      if (value.length > 8) {
-        formatted += '-' + value.substring(8, 13);
+      if (value.length > 7) {
+        formatted += '-' + value.substring(7, 12); // 5 digit terakhir
       }
     }
     
